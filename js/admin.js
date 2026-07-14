@@ -457,7 +457,7 @@
     const file = importFile.files[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => {
+    reader.onload = async () => {
       try {
         const parsed = JSON.parse(reader.result);
         if (!parsed.sources || !parsed.routes) throw new Error('Missing sources/routes');
