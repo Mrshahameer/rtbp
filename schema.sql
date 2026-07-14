@@ -1,6 +1,12 @@
 -- Enable UUID extension
 create extension if not exists "uuid-ossp";
 
+-- Drop existing tables to recreate fresh
+drop table if exists public.routes cascade;
+drop table if exists public.sources cascade;
+drop table if exists public.user_profiles cascade;
+drop table if exists public.settings cascade;
+
 -- 1. Table for sources
 create table public.sources (
   id text primary key,
