@@ -82,7 +82,7 @@ async function getSupabaseClient() {
     return null;
   }
   try {
-    const res = await fetch(`${BACKEND_URL}/api/config`);
+    const res = await fetch(`${BACKEND_URL}/api/config`, { signal: AbortSignal.timeout(3000) });
     const { supabaseUrl, supabaseAnonKey } = await res.json();
     if (!supabaseUrl || !supabaseAnonKey) {
       console.warn("Supabase credentials not configured in Vercel environment variables.");
