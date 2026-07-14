@@ -131,6 +131,13 @@ async function loadConfig() {
     if (sourcesRes.error) throw sourcesRes.error;
     if (routesRes.error) throw routesRes.error;
 
+    // Auto-seed defaults if database is empty
+    if ((!sourcesRes.data || sourcesRes.data.length === 0) && (!routesRes.data || routesRes.data.length === 0)) {
+      console.log("Database is empty. Seeding defaults...");
+      await saveConfig(DEFAULT_CONFIG);
+      return loadConfig();
+    }
+
     const sources = (sourcesRes.data || []).map(s => ({
       id: s.id,
       name: s.name,

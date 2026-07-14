@@ -30,6 +30,12 @@
       config = await loadConfig();
       clientProfile = await loadUserProfile(user.id);
 
+      // Show admin link if admin
+      const adminLink = document.getElementById('admin-link');
+      if (adminLink && clientProfile && clientProfile.is_admin) {
+        adminLink.style.display = '';
+      }
+
       // 3. UI render
       refreshZipVisibility();
       renderBoard();
