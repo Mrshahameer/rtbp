@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login - Webster Solutions LLC</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/js/defaults.js"></script>
+  <style>
+    .login-container {
+      max-width: 400px;
+      margin: 100px auto;
+      padding: 30px;
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: 0 8px 30px rgba(0,0,0,0.05);
+    }
+    .login-header {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+    .login-header h2 {
+      margin: 0;
+      color: var(--teal);
+      font-size: 24px;
+      font-weight: 700;
+    }
+    .login-header p {
+      margin: 5px 0 0;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .form-group {
+      margin-bottom: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .form-group label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+    }
+    .form-group input {
+      padding: 10px 12px;
+      font-size: 14px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--panel);
+      color: var(--text);
+      transition: border-color .15s ease;
+    }
+    .form-group input:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+    .login-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 24px;
+    }
+    .login-err {
+      color: var(--red);
+      background: rgba(229,88,107,0.08);
+      border: 1px solid rgba(229,88,107,0.2);
+      padding: 10px;
+      border-radius: 6px;
+      font-size: 13px;
+      display: none;
+    }
+    .toggle-mode {
+      text-align: center;
+      font-size: 13px;
+      color: var(--muted);
+      margin-top: 14px;
+    }
+    .toggle-mode a {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .toggle-mode a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="login-container">
+    <div class="login-header">
+      <h2>Webster Solutions LLC</h2>
+      <p id="header-subtitle">Sign in to access your Route Board</p>
+    </div>
+
+    <div class="login-err" id="auth-err"></div>
+
+    <form id="auth-form">
+      <div class="form-group">
+        <label for="auth-email">Email Address</label>
+        <input type="email" id="auth-email" required placeholder="name@example.com" />
+      </div>
+      <div class="form-group">
+        <label for="auth-password">Password</label>
+        <input type="password" id="auth-password" required placeholder="••••••••" minlength="6" />
+      </div>
+
+      <div class="login-actions">
+        <button type="submit" class="btn btn-primary" id="submit-btn" style="justify-content: center; font-size:14px; padding:12px;">Sign In</button>
+      </div>
+    </form>
+
+    <div class="toggle-mode">
+      <span id="toggle-text">Don't have an account?</span>
+      <a href="#" id="toggle-link">Sign Up</a>
+    </div>
+  </div>
+
+  <script src="/js/login.js"></script>
+</body>
+</html>

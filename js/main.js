@@ -1,5 +1,6 @@
 (() => {
-  let config = loadConfig();
+  let config = null;
+  let clientProfile = null;
 
   const form        = document.getElementById('query-form');
   const callerInput = document.getElementById('caller-id');
@@ -9,12 +10,39 @@
   const runBtn      = document.getElementById('run-btn');
   const runDot      = document.getElementById('run-dot');
   const summaryBar  = document.getElementById('summary-bar');
+  const logoutBtn   = document.getElementById('logout-btn');
 
   function refreshZipVisibility() {
     const needs = config.routes.some(r => r.fields.includes('zip'));
     zipField.style.display = needs ? '' : 'none';
   }
-  refreshZipVisibility();
+
+  async function init() {
+    // 1. Auth check
+    const user = await checkAuth();
+    if (!user) {
+      window.location.href = '/login.html';
+      return;
+    }
+
+    // 2. Load DB values
+    config = await loadConfig();
+    clientProfile = await loadUserProfile(user.id);
+
+    // 3. UI render
+    refreshZipVisibility();
+    renderBoard();
+
+    // 4. Setup logout
+    if (logoutBtn) {
+      logoutBtn.addEventListener('click', async () => {
+        const supabase = await getSupabaseClient();
+        if (supabase) await supabase.auth.signOut();
+        window.location.href = '/login.html';
+      });
+    }
+  }
+  init();
 
   // ── Phone number cleaning (mirrors RTB Pulse) ─────────────
   // Strip non-digits, remove leading 1 from 11-digit numbers, cap at 10 digits.
@@ -340,10 +368,14 @@
   // ── Run all routes in parallel ────────────────────────────
   async function runCheck(callerId, zip) {
     // Re-read config each run so admin payout toggle takes effect immediately
-    config = loadConfig();
-    refreshZipVisibility();
-
-    const payoutVisible = config.payoutVisible === true;
+    config = await loadConfig();
+    
+    // Refresh client profile to get latest reveal_payout settings
+    const user = await checkAuth();
+    if (user) {
+      clientProfile = await loadUserProfile(user.id);
+    }
+    const payoutVisible = clientProfile ? clientProfile.reveal_payout === true : false;
     const rangeSize     = config.payoutRangeSize || 40;
 
     renderBoard();

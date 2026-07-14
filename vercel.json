@@ -1,6 +1,6 @@
 {
+  "cleanUrls": true,
   "functions": {
-    "api/proxy.js": { "maxDuration": 15 },
-    "api/admin-auth.js": { "maxDuration": 10 }
+    "api/proxy.js": { "maxDuration": 15 }
   }
 }

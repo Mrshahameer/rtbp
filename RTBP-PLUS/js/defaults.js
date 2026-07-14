@@ -1,10 +1,4 @@
-// Default route board — seeded into localStorage the first time the app runs.
-// Every route belongs to a SOURCE (the buyer/publisher account these routes
-// come from, e.g. "Cost Guide" or "Evercontractor"). This is what future
-// admin-added routes must also carry, so the board can group/filter by it.
-//
-// Placeholders inside a url: {{CALLER_ID}} and {{ZIP}}
-// `fields` lists which of those a route actually needs, in order.
+// defaults.js for Chrome Extension Side Panel (uses chrome.storage.local asynchronously)
 
 const DEFAULT_CONFIG = {
   sources: [
@@ -62,16 +56,13 @@ const DEFAULT_CONFIG = {
       fields: ['caller_id']
     }
   ],
-  // Payout display controls (admin-only)
-  payoutVisible: false,   // false = show tier (1x/2x/3x), true = show actual $
-  payoutRangeSize: 40     // each tier covers this many dollars: 1-40=1x, 41-80=2x …
+  payoutVisible: false,
+  payoutRangeSize: 40
 };
 
 const STORAGE_KEY = 'rtb_board_config_v1';
 
-const BACKEND_URL = window.location.origin.startsWith('chrome-extension')
-  ? 'https://rtbp-nine.vercel.app' // <--- UPDATE THIS with your deployed Vercel URL
-  : window.location.origin;
+const BACKEND_URL = 'https://rtbp-nine.vercel.app'; // <--- UPDATE THIS with your deployed Vercel URL
 
 let supabaseInstance = null;
 
@@ -85,7 +76,7 @@ async function getSupabaseClient() {
     const res = await fetch(`${BACKEND_URL}/api/config`);
     const { supabaseUrl, supabaseAnonKey } = await res.json();
     if (!supabaseUrl || !supabaseAnonKey) {
-      console.warn("Supabase credentials not configured in Vercel environment variables.");
+      console.warn("Supabase credentials not configured.");
       return null;
     }
     supabaseInstance = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
@@ -96,20 +87,20 @@ async function getSupabaseClient() {
   }
 }
 
-// Helper to load config fallback from localStorage
-function fallbackLoadConfig() {
+// Fallback to chrome.storage.local for Extension
+async function fallbackLoadConfig() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_CONFIG));
-      return structuredClone(DEFAULT_CONFIG);
+    const res = await chrome.storage.local.get([STORAGE_KEY]);
+    let data = res[STORAGE_KEY];
+    if (!data) {
+      data = structuredClone(DEFAULT_CONFIG);
+      await chrome.storage.local.set({ [STORAGE_KEY]: data });
     }
-    const parsed = JSON.parse(raw);
-    if (parsed.payoutVisible  === undefined) parsed.payoutVisible  = false;
-    if (parsed.payoutRangeSize === undefined) parsed.payoutRangeSize = 40;
-    if (parsed.sources) parsed.sources.forEach(s => { if (s.paused === undefined) s.paused = false; });
-    if (parsed.routes) parsed.routes.forEach(r => { if (r.paused === undefined) r.paused = false; });
-    return parsed;
+    if (data.payoutVisible === undefined) data.payoutVisible = false;
+    if (data.payoutRangeSize === undefined) data.payoutRangeSize = 40;
+    if (data.sources) data.sources.forEach(s => { if (s.paused === undefined) s.paused = false; });
+    if (data.routes) data.routes.forEach(r => { if (r.paused === undefined) r.paused = false; });
+    return data;
   } catch (e) {
     return structuredClone(DEFAULT_CONFIG);
   }
@@ -150,7 +141,6 @@ async function loadConfig() {
     const payoutRangeSizeSetting = settingsRes.data?.find(s => s.key === 'payoutRangeSize');
     const rangeSize = payoutRangeSizeSetting ? parseInt(payoutRangeSizeSetting.value) : 40;
 
-    // Check currently logged-in user profile to determine payout visibility
     let payoutVisible = false;
     const { data: { session } } = await supabase.auth.getSession();
     if (session?.user) {
@@ -167,7 +157,7 @@ async function loadConfig() {
       payoutRangeSize: rangeSize
     };
   } catch (e) {
-    console.error("Supabase loadConfig failed, loading local:", e);
+    console.error("Supabase loadConfig failed, loading local extension config:", e);
     return fallbackLoadConfig();
   }
 }
@@ -175,15 +165,15 @@ async function loadConfig() {
 async function saveConfig(newConfig) {
   const supabase = await getSupabaseClient();
   if (!supabase) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(newConfig));
+    try {
+      await chrome.storage.local.set({ [STORAGE_KEY]: newConfig });
+    } catch (e) {}
     return;
   }
 
   try {
-    // 1. Update settings
     await supabase.from('settings').upsert({ key: 'payoutRangeSize', value: newConfig.payoutRangeSize });
 
-    // 2. Load existing DB records to determine CRUD actions
     const [existingSourcesRes, existingRoutesRes] = await Promise.all([
       supabase.from('sources').select('id'),
       supabase.from('routes').select('id')
@@ -213,7 +203,6 @@ async function saveConfig(newConfig) {
       paused: r.paused ?? false
     }));
 
-    // Execute operations ordered to respect SQL constraints
     if (routesToDelete.length > 0) {
       await supabase.from('routes').delete().in('id', routesToDelete);
     }
@@ -227,8 +216,10 @@ async function saveConfig(newConfig) {
       await supabase.from('routes').upsert(routesToUpsert);
     }
   } catch (e) {
-    console.error("Supabase saveConfig failed, saving local:", e);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(newConfig));
+    console.error("Supabase saveConfig failed, saving local extension config:", e);
+    try {
+      await chrome.storage.local.set({ [STORAGE_KEY]: newConfig });
+    } catch (err) {}
   }
 }
 
@@ -252,10 +243,11 @@ function uid(prefix) {
 }
 
 // ── Automatic Theme management ─────────────────────────────
-function initTheme() {
+async function initTheme() {
   let theme = 'light';
   try {
-    theme = localStorage.getItem('theme') || 'light';
+    const res = await chrome.storage.local.get(['theme']);
+    theme = res.theme || 'light';
   } catch (e) {
     theme = 'light';
   }
@@ -279,13 +271,13 @@ function initTheme() {
     const btn = document.getElementById('theme-toggle-btn');
     if (!btn) return;
     btn.textContent = theme === 'dark' ? '🌙' : '☀️';
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
       const isDark = document.documentElement.classList.toggle('dark-theme');
       document.body.classList.toggle('dark-theme', isDark);
       const newTheme = isDark ? 'dark' : 'light';
       btn.textContent = isDark ? '🌙' : '☀️';
       try {
-        localStorage.setItem('theme', newTheme);
+        await chrome.storage.local.set({ theme: newTheme });
       } catch (e) {}
     });
   }

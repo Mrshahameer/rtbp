@@ -8,12 +8,33 @@
   const runBtn      = document.getElementById('run-btn');
   const runDot      = document.getElementById('run-dot');
   const summaryBar  = document.getElementById('summary-bar');
-
+  let clientProfile = null;
+  const logoutBtn   = document.getElementById('logout-btn');
 
   async function init() {
+    // 1. Auth check
+    const user = await checkAuth();
+    if (!user) {
+      window.location.href = '/login.html';
+      return;
+    }
+
+    // 2. Load DB values
     config = await loadConfig();
+    clientProfile = await loadUserProfile(user.id);
+
+    // 3. UI render
     refreshZipVisibility();
     renderBoard();
+
+    // 4. Setup logout
+    if (logoutBtn) {
+      logoutBtn.addEventListener('click', async () => {
+        const supabase = await getSupabaseClient();
+        if (supabase) await supabase.auth.signOut();
+        window.location.href = '/login.html';
+      });
+    }
   }
 
   function refreshZipVisibility() {
@@ -339,10 +360,13 @@
   // ── Run all routes in parallel ────────────────────────────
   async function runCheck(callerId, zip) {
     config = await loadConfig();
-    refreshZipVisibility();
-
-
-    const payoutVisible = config.payoutVisible === true;
+    
+    // Refresh client profile to get latest reveal_payout settings
+    const user = await checkAuth();
+    if (user) {
+      clientProfile = await loadUserProfile(user.id);
+    }
+    const payoutVisible = clientProfile ? clientProfile.reveal_payout === true : false;
     const rangeSize     = config.payoutRangeSize || 40;
 
     renderBoard();

@@ -1,11 +1,8 @@
 (() => {
-  const SESSION_KEY = 'rtb_admin_unlocked';
-  let config = loadConfig();
+  let config = null;
+  let clientProfile = null;
 
-  const gate = document.getElementById('gate');
-  const gateForm = document.getElementById('gate-form');
-  const gatePassword = document.getElementById('gate-password');
-  const gateErr = document.getElementById('gate-err');
+  const deniedScreen = document.getElementById('denied-screen');
   const adminContent = document.getElementById('admin-content');
   const toastEl = document.getElementById('toast');
 
@@ -15,46 +12,39 @@
     setTimeout(() => toastEl.classList.remove('show'), 2200);
   }
 
-  function unlock() {
-    gate.style.display = 'none';
+  async function init() {
+    // 1. Auth check
+    const user = await checkAuth();
+    if (!user) {
+      window.location.href = '/login.html';
+      return;
+    }
+
+    // 2. Fetch profile and verify admin role
+    clientProfile = await loadUserProfile(user.id);
+    if (!clientProfile || !clientProfile.is_admin) {
+      deniedScreen.style.display = 'block';
+      adminContent.style.display = 'none';
+      return;
+    }
+
+    // 3. Load DB config and unlock admin page
+    config = await loadConfig();
+    deniedScreen.style.display = 'none';
     adminContent.style.display = '';
+
     initPayoutSettings();
     renderSources();
     renderTable();
+    renderUsers();
   }
 
-  if (sessionStorage.getItem(SESSION_KEY) === '1') unlock();
+  init();
 
-  gateForm.addEventListener('submit', async e => {
-    e.preventDefault();
-    gateErr.style.display = 'none';
-    const submitBtn = gateForm.querySelector('button[type=submit]');
-    submitBtn.disabled = true;
-    try {
-      const res = await fetch('/api/admin-auth', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: gatePassword.value })
-      });
-      const body = await res.json();
-      if (res.ok && body.ok) {
-        sessionStorage.setItem(SESSION_KEY, '1');
-        unlock();
-      } else {
-        gateErr.textContent = body.error || 'Incorrect password.';
-        gateErr.style.display = 'block';
-      }
-    } catch (err) {
-      gateErr.textContent = 'Could not reach the server. Try again.';
-      gateErr.style.display = 'block';
-    } finally {
-      submitBtn.disabled = false;
-    }
-  });
-
-  document.getElementById('logout-btn').addEventListener('click', () => {
-    sessionStorage.removeItem(SESSION_KEY);
-    location.reload();
+  document.getElementById('logout-btn').addEventListener('click', async () => {
+    const supabase = await getSupabaseClient();
+    if (supabase) await supabase.auth.signOut();
+    window.location.href = '/login.html';
   });
 
   // ── Payout Settings ───────────────────────────────────────
@@ -89,10 +79,10 @@
     rangeInput.value = config.payoutRangeSize || 40;
 
     // Toggle click on the container div (avoids double toggle bugs)
-    container.addEventListener('click', () => {
+    container.addEventListener('click', async () => {
       chk.checked = !chk.checked;
       config.payoutVisible = chk.checked;
-      saveConfig(config);
+      await saveConfig(config);
       applyToggleUI(chk.checked);
       toast(chk.checked ? '💰 Payout revealed to agents' : '🔒 Payout hidden — agents see tiers');
     });
@@ -106,11 +96,11 @@
     }
     updateHint(config.payoutRangeSize || 40);
 
-    saveBtn.addEventListener('click', () => {
+    saveBtn.addEventListener('click', async () => {
       const val = parseInt(rangeInput.value);
       if (!val || val < 1) { toast('⚠️ Enter a valid range size'); return; }
       config.payoutRangeSize = val;
-      saveConfig(config);
+      await saveConfig(config);
       updateHint(val);
       toast(`✅ Tier size updated: $1–${val} = 1x, $${val+1}–${val*2} = 2x …`);
     });
@@ -155,11 +145,11 @@
     }
 
     tbody.querySelectorAll('[data-action=toggle-pause-route]').forEach(btn =>
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async () => {
         const route = config.routes.find(r => r.id === btn.dataset.id);
         if (!route) return;
         route.paused = !route.paused;
-        saveConfig(config);
+        await saveConfig(config);
         renderTable();
         toast(route.paused ? `⏸️ Route "${route.name}" paused` : `▶️ Route "${route.name}" active`);
       })
@@ -169,16 +159,79 @@
       btn.addEventListener('click', () => openRouteModal(btn.dataset.id))
     );
     tbody.querySelectorAll('[data-action=delete]').forEach(btn =>
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async () => {
         const route = config.routes.find(r => r.id === btn.dataset.id);
         if (!route) return;
         if (!confirm(`Delete route "${route.name}"? This can't be undone here — export a backup first if unsure.`)) return;
         config.routes = config.routes.filter(r => r.id !== btn.dataset.id);
-        saveConfig(config);
+        await saveConfig(config);
         renderTable();
         toast('Route deleted');
       })
     );
+  }
+
+  async function renderUsers() {
+    const tbody = document.getElementById('user-tbody');
+    tbody.innerHTML = '';
+    
+    const supabase = await getSupabaseClient();
+    if (!supabase) {
+      tbody.innerHTML = `<tr><td colspan="3" style="color:var(--muted-2); text-align:center; padding:20px;">Supabase not configured.</td></tr>`;
+      return;
+    }
+
+    try {
+      const { data: users, error } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .order('email');
+      
+      if (error) throw error;
+
+      if (!users || users.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="3" style="color:var(--muted-2); text-align:center; padding:20px;">No registered users yet.</td></tr>`;
+        return;
+      }
+
+      for (const u of users) {
+        const tr = document.createElement('tr');
+        tr.style.borderBottom = '1px solid var(--border-soft)';
+        tr.innerHTML = `
+          <td style="padding:10px 12px;"><strong>${escapeHtml(u.email)}</strong></td>
+          <td style="padding:10px 12px;"><span class="field-tag" style="background:${u.is_admin ? 'rgba(15,128,234,0.1)' : 'var(--panel-2)'}">${u.is_admin ? 'Admin' : 'Agent'}</span></td>
+          <td style="padding:10px 12px; text-align:right;">
+            <button class="btn ${u.reveal_payout ? 'btn-primary' : 'btn-ghost'} btn-sm" data-action="toggle-payout" data-id="${u.id}">
+              ${u.reveal_payout ? '💰 Revealed' : '🔒 Hidden'}
+            </button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      }
+
+      tbody.querySelectorAll('[data-action=toggle-payout]').forEach(btn =>
+        btn.addEventListener('click', async () => {
+          const targetUser = users.find(u => u.id === btn.dataset.id);
+          if (!targetUser) return;
+          btn.disabled = true;
+          try {
+            const { error: updateErr } = await supabase
+              .from('user_profiles')
+              .update({ reveal_payout: !targetUser.reveal_payout })
+              .eq('id', targetUser.id);
+            if (updateErr) throw updateErr;
+            toast(`Permissions updated for ${targetUser.email}`);
+            await renderUsers();
+          } catch (err) {
+            toast(`⚠️ Update failed: ${err.message}`);
+            btn.disabled = false;
+          }
+        })
+      );
+    } catch (e) {
+      console.error("Failed to render users:", e);
+      tbody.innerHTML = `<tr><td colspan="3" style="color:var(--red); text-align:center; padding:20px;">Error loading users.</td></tr>`;
+    }
   }
 
   // ── Route modal ──────────────────────────────────────────
@@ -236,7 +289,7 @@
   document.getElementById('route-cancel-btn').addEventListener('click', closeRouteModal);
   routeBackdrop.addEventListener('click', e => { if (e.target === routeBackdrop) closeRouteModal(); });
 
-  routeForm.addEventListener('submit', e => {
+  routeForm.addEventListener('submit', async e => {
     e.preventDefault();
     const fields = [];
     if (routeFieldCaller.checked) fields.push('caller_id');
@@ -270,7 +323,7 @@
       });
       toast('Route added');
     }
-    saveConfig(config);
+    await saveConfig(config);
     renderTable();
     closeRouteModal();
   });
@@ -300,11 +353,11 @@
     }
 
     list.querySelectorAll('[data-action=toggle-pause-src]').forEach(btn =>
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async () => {
         const src = config.sources.find(s => s.id === btn.dataset.id);
         if (!src) return;
         src.paused = !src.paused;
-        saveConfig(config);
+        await saveConfig(config);
         renderSources();
         renderTable();
         toast(src.paused ? `⏸️ Source "${src.name}" paused` : `▶️ Source "${src.name}" active`);
@@ -315,7 +368,7 @@
       btn.addEventListener('click', () => openSourceModal(btn.dataset.id))
     );
     list.querySelectorAll('[data-action=delete-src]').forEach(btn =>
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async () => {
         const src = config.sources.find(s => s.id === btn.dataset.id);
         if (!src) return;
         const routeCount = config.routes.filter(r => r.sourceId === src.id).length;
@@ -325,7 +378,7 @@
         if (!confirm(msg)) return;
         config.routes = config.routes.filter(r => r.sourceId !== src.id);
         config.sources = config.sources.filter(s => s.id !== src.id);
-        saveConfig(config);
+        await saveConfig(config);
         renderSources();
         renderTable();
         toast(`Source "${src.name}" deleted`);
@@ -360,7 +413,7 @@
   document.getElementById('source-cancel-btn').addEventListener('click', () => sourceBackdrop.classList.remove('open'));
   sourceBackdrop.addEventListener('click', e => { if (e.target === sourceBackdrop) sourceBackdrop.classList.remove('open'); });
 
-  sourceForm.addEventListener('submit', e => {
+  sourceForm.addEventListener('submit', async e => {
     e.preventDefault();
     const name = document.getElementById('source-name').value.trim();
     if (!name) return;
@@ -377,7 +430,7 @@
       config.sources.push({ id: uid('src'), name, color });
       toast(`Source "${name}" added`);
     }
-    saveConfig(config);
+    await saveConfig(config);
     sourceBackdrop.classList.remove('open');
     renderSources();
     renderTable();
@@ -396,7 +449,7 @@
 
   const importFile = document.getElementById('import-file');
   document.getElementById('import-btn').addEventListener('click', () => importFile.click());
-  importFile.addEventListener('change', () => {
+  importFile.addEventListener('change', async () => {
     const file = importFile.files[0];
     if (!file) return;
     const reader = new FileReader();
@@ -406,7 +459,7 @@
         if (!parsed.sources || !parsed.routes) throw new Error('Missing sources/routes');
         if (!confirm('Replace the current route board with this backup?')) return;
         config = parsed;
-        saveConfig(config);
+        await saveConfig(config);
         renderTable();
         toast('Backup imported');
       } catch (err) {

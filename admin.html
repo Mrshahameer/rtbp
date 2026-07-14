@@ -9,27 +9,11 @@
 <body>
 <div class="wrap">
 
-  <!-- Password gate -->
-  <div class="gate" id="gate">
-    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:18px;">
-      <div>
-        <h2 style="margin:0 0 2px;">Manage routes</h2>
-        <div style="font-size:11px; color:var(--muted-2); letter-spacing:0.04em;">Webster Solutions LLC</div>
-      </div>
-      <div style="display:flex; align-items:center; gap:8px;">
-        <button id="theme-toggle-btn" class="btn btn-ghost" style="padding: 6px 10px; font-size: 14px;" title="Toggle theme">☀️</button>
-        <a href="/index.html" class="btn btn-ghost" style="font-size:12px; padding:7px 13px;">← Dashboard</a>
-      </div>
-    </div>
-    <p>Enter the admin password to add or edit buyer routes.</p>
-    <form id="gate-form">
-      <div class="form-row">
-        <label for="gate-password">Password</label>
-        <input type="password" id="gate-password" autocomplete="current-password" />
-      </div>
-      <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;">Unlock</button>
-      <div class="err" id="gate-err">Incorrect password.</div>
-    </form>
+  <!-- Access Denied screen -->
+  <div id="denied-screen" style="display:none; max-width:480px; margin:100px auto; padding:40px; text-align:center; background:var(--panel-2); border:1px solid var(--border); border-radius:var(--radius);">
+    <h2 style="color:var(--red); margin:0 0 10px;">Access Denied</h2>
+    <p style="color:var(--muted); font-size:14px; margin-bottom:24px;">You do not have administrative privileges to manage routes.</p>
+    <a href="/index.html" class="btn btn-primary" style="justify-content:center; display:inline-flex;">Return to Dashboard</a>
   </div>
 
   <!-- Admin content -->
@@ -41,13 +25,13 @@
         </div>
         <div>
           <h1>Webster Solutions LLC</h1>
-          <div class="sub">RTB Route Board — stored in this browser only</div>
+          <div class="sub">RTB Route Board — administrative panel</div>
         </div>
       </div>
       <div class="top-actions">
         <button id="theme-toggle-btn" class="btn btn-ghost" style="padding: 6px 10px; font-size: 14px;" title="Toggle theme">☀️</button>
         <a href="/index.html" class="btn btn-ghost">← Board</a>
-        <button class="btn btn-ghost btn-sm" id="logout-btn">Lock</button>
+        <button class="btn btn-ghost btn-sm" id="logout-btn">Logout</button>
       </div>
     </div>
 
@@ -82,6 +66,27 @@
             <span style="font-size:11px; color:var(--muted-2);" id="payout-range-hint">$1–40 = 1x &nbsp;·&nbsp; $41–80 = 2x &nbsp;·&nbsp; $81–120 = 3x …</span>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- User Management Settings -->
+    <div class="panel panel-pad" style="margin-bottom:18px; border-color: rgba(16,185,129,0.25);">
+      <div style="margin-bottom:14px;">
+        <span style="font-size:11px; font-weight:700; letter-spacing:.08em; color:var(--muted-2); text-transform:uppercase;">👥 User Payout Settings</span>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="route-table" style="width:100%; border-collapse:collapse;">
+          <thead>
+            <tr>
+              <th style="text-align:left;">Email</th>
+              <th style="text-align:left;">Role</th>
+              <th style="text-align:right;">Reveal Payout</th>
+            </tr>
+          </thead>
+          <tbody id="user-tbody">
+            <!-- Populated dynamically -->
+          </tbody>
+        </table>
       </div>
     </div>
 
@@ -177,6 +182,7 @@
 
 <div class="toast" id="toast"></div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="/js/defaults.js"></script>
 <script src="/js/admin.js"></script>
 </body>
