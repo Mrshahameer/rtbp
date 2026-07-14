@@ -70,7 +70,7 @@ const DEFAULT_CONFIG = {
 const STORAGE_KEY = 'rtb_board_config_v1';
 
 const BACKEND_URL = window.location.origin.startsWith('chrome-extension')
-  ? 'https://rtbp-nine.vercel.app' // <--- UPDATE THIS with your deployed Vercel URL
+  ? 'https://rtbp.vercel.app' // Fallback for extension
   : window.location.origin;
 
 let supabaseInstance = null;
@@ -152,12 +152,9 @@ async function loadConfig() {
 
     // Check currently logged-in user profile to determine payout visibility
     let payoutVisible = false;
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session?.user) {
-      const { data: profile } = await supabase.from('user_profiles').select('reveal_payout').eq('id', session.user.id).maybeSingle();
-      if (profile) {
-        payoutVisible = profile.reveal_payout === true;
-      }
+    const currentUser = await checkAuth();
+    if (currentUser) {
+      payoutVisible = currentUser.reveal_payout === true;
     }
 
     return {
@@ -235,27 +232,34 @@ async function saveConfig(newConfig) {
 // Authentication Helpers
 async function checkAuth() {
   try {
-    const supabase = await getSupabaseClient();
-    if (!supabase) return { id: 'local-admin', email: 'admin@webstersolutions.com' };
-    const { data: { session } } = await supabase.auth.getSession();
-    return session?.user || null;
+    const raw = localStorage.getItem('rtb_user_session');
+    if (!raw) return null;
+    const session = JSON.parse(raw);
+    
+    // Verify user profile against DB to fetch live reveal_payout settings
+    const profile = await loadUserProfile(session.id);
+    if (!profile) {
+      localStorage.removeItem('rtb_user_session');
+      return null;
+    }
+    return profile;
   } catch (e) {
-    console.error("checkAuth failed, falling back to local:", e);
-    return { id: 'local-admin', email: 'admin@webstersolutions.com' };
+    console.error("checkAuth failed:", e);
+    return null;
   }
 }
 
 async function loadUserProfile(userId) {
   try {
     const supabase = await getSupabaseClient();
-    if (!supabase || userId === 'local-admin') {
-      return { id: userId, email: 'admin@webstersolutions.com', reveal_payout: true, is_admin: true };
+    if (!supabase) {
+      return { id: 'local-admin', email: 'admin@webstersolutions.com', reveal_payout: true, is_admin: true };
     }
     const { data: profile } = await supabase.from('user_profiles').select('*').eq('id', userId).maybeSingle();
-    return profile || { id: userId, email: 'user@webstersolutions.com', reveal_payout: false, is_admin: false };
+    return profile;
   } catch (e) {
-    console.error("loadUserProfile failed, falling back:", e);
-    return { id: userId, email: 'admin@webstersolutions.com', reveal_payout: true, is_admin: true };
+    console.error("loadUserProfile failed:", e);
+    return null;
   }
 }
 

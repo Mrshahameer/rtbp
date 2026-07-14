@@ -36,9 +36,8 @@
 
       // 4. Setup logout
       if (logoutBtn) {
-        logoutBtn.addEventListener('click', async () => {
-          const supabase = await getSupabaseClient();
-          if (supabase) await supabase.auth.signOut();
+        logoutBtn.addEventListener('click', () => {
+          localStorage.removeItem('rtb_user_session');
           window.location.href = '/login.html';
         });
       }

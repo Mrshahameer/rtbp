@@ -46,9 +46,8 @@
 
   init();
 
-  document.getElementById('logout-btn').addEventListener('click', async () => {
-    const supabase = await getSupabaseClient();
-    if (supabase) await supabase.auth.signOut();
+  document.getElementById('logout-btn').addEventListener('click', () => {
+    localStorage.removeItem('rtb_user_session');
     window.location.href = '/login.html';
   });
 

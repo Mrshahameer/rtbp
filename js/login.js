@@ -45,21 +45,54 @@
 
     try {
       if (mode === 'signin') {
-        const { error, data } = await supabase.auth.signInWithPassword({ email, password });
+        const { data: user, error } = await supabase
+          .from('user_profiles')
+          .select('*')
+          .eq('email', email)
+          .eq('password', password)
+          .maybeSingle();
+
         if (error) throw error;
+        if (!user) throw new Error('Invalid email or password.');
+
+        // Save custom session
+        localStorage.setItem('rtb_user_session', JSON.stringify({ id: user.id, email: user.email, is_admin: user.is_admin }));
         window.location.href = '/index.html';
       } else {
-        const { error, data } = await supabase.auth.signUp({ email, password });
-        if (error) throw error;
-        if (data?.session) {
-          window.location.href = '/index.html';
-        } else {
-          errBox.style.background = 'rgba(95,208,138,0.08)';
-          errBox.style.borderColor = 'rgba(95,208,138,0.2)';
-          errBox.style.color = 'var(--green)';
-          errBox.textContent = 'Registration successful! Check your email to confirm your account (or log in directly if confirmation is disabled in your Supabase dashboard).';
-          errBox.style.display = 'block';
-        }
+        // Check if email already registered
+        const { data: existing, error: checkErr } = await supabase
+          .from('user_profiles')
+          .select('id')
+          .eq('email', email)
+          .maybeSingle();
+
+        if (checkErr) throw checkErr;
+        if (existing) throw new Error('Email is already registered.');
+
+        // First user gets admin privileges
+        const { data: allUsers } = await supabase.from('user_profiles').select('id').limit(1);
+        const isFirst = !allUsers || allUsers.length === 0;
+
+        const { error: insertErr } = await supabase
+          .from('user_profiles')
+          .insert({
+            email,
+            password,
+            is_admin: isFirst,
+            reveal_payout: isFirst
+          });
+
+        if (insertErr) throw insertErr;
+
+        // Auto sign in
+        const { data: newUser } = await supabase
+          .from('user_profiles')
+          .select('*')
+          .eq('email', email)
+          .maybeSingle();
+
+        localStorage.setItem('rtb_user_session', JSON.stringify({ id: newUser.id, email: newUser.email, is_admin: newUser.is_admin }));
+        window.location.href = '/index.html';
       }
     } catch (err) {
       errBox.style.background = 'rgba(229,88,107,0.08)';
