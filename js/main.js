@@ -429,6 +429,4 @@
     if (!callerId) { callerInput.focus(); return; }
     runCheck(callerId, zip);
   });
-
-  renderBoard();
 })();
