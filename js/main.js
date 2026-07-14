@@ -18,28 +18,32 @@
   }
 
   async function init() {
-    // 1. Auth check
-    const user = await checkAuth();
-    if (!user) {
-      window.location.href = '/login.html';
-      return;
-    }
-
-    // 2. Load DB values
-    config = await loadConfig();
-    clientProfile = await loadUserProfile(user.id);
-
-    // 3. UI render
-    refreshZipVisibility();
-    renderBoard();
-
-    // 4. Setup logout
-    if (logoutBtn) {
-      logoutBtn.addEventListener('click', async () => {
-        const supabase = await getSupabaseClient();
-        if (supabase) await supabase.auth.signOut();
+    try {
+      // 1. Auth check
+      const user = await checkAuth();
+      if (!user) {
         window.location.href = '/login.html';
-      });
+        return;
+      }
+
+      // 2. Load DB values
+      config = await loadConfig();
+      clientProfile = await loadUserProfile(user.id);
+
+      // 3. UI render
+      refreshZipVisibility();
+      renderBoard();
+
+      // 4. Setup logout
+      if (logoutBtn) {
+        logoutBtn.addEventListener('click', async () => {
+          const supabase = await getSupabaseClient();
+          if (supabase) await supabase.auth.signOut();
+          window.location.href = '/login.html';
+        });
+      }
+    } catch (err) {
+      console.error("Initialization failed:", err);
     }
   }
   init();

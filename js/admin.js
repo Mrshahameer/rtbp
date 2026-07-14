@@ -13,30 +13,35 @@
   }
 
   async function init() {
-    // 1. Auth check
-    const user = await checkAuth();
-    if (!user) {
-      window.location.href = '/login.html';
-      return;
+    try {
+      // 1. Auth check
+      const user = await checkAuth();
+      if (!user) {
+        window.location.href = '/login.html';
+        return;
+      }
+
+      // 2. Fetch profile and verify admin role
+      clientProfile = await loadUserProfile(user.id);
+      if (!clientProfile || !clientProfile.is_admin) {
+        deniedScreen.style.display = 'block';
+        adminContent.style.display = 'none';
+        return;
+      }
+
+      // 3. Load DB config and unlock admin page
+      config = await loadConfig();
+      deniedScreen.style.display = 'none';
+      adminContent.style.display = '';
+
+      initPayoutSettings();
+      renderSources();
+      renderTable();
+      renderUsers();
+    } catch (err) {
+      console.error("Initialization failed:", err);
+      toast("⚠️ Initialization error: " + err.message);
     }
-
-    // 2. Fetch profile and verify admin role
-    clientProfile = await loadUserProfile(user.id);
-    if (!clientProfile || !clientProfile.is_admin) {
-      deniedScreen.style.display = 'block';
-      adminContent.style.display = 'none';
-      return;
-    }
-
-    // 3. Load DB config and unlock admin page
-    config = await loadConfig();
-    deniedScreen.style.display = 'none';
-    adminContent.style.display = '';
-
-    initPayoutSettings();
-    renderSources();
-    renderTable();
-    renderUsers();
   }
 
   init();

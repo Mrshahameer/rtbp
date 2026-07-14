@@ -234,17 +234,29 @@ async function saveConfig(newConfig) {
 
 // Authentication Helpers
 async function checkAuth() {
-  const supabase = await getSupabaseClient();
-  if (!supabase) return { id: 'local-admin', email: 'admin@webstersolutions.com' };
-  const { data: { session } } = await supabase.auth.getSession();
-  return session?.user || null;
+  try {
+    const supabase = await getSupabaseClient();
+    if (!supabase) return { id: 'local-admin', email: 'admin@webstersolutions.com' };
+    const { data: { session } } = await supabase.auth.getSession();
+    return session?.user || null;
+  } catch (e) {
+    console.error("checkAuth failed, falling back to local:", e);
+    return { id: 'local-admin', email: 'admin@webstersolutions.com' };
+  }
 }
 
 async function loadUserProfile(userId) {
-  const supabase = await getSupabaseClient();
-  if (!supabase) return { id: userId, email: 'admin@webstersolutions.com', reveal_payout: true, is_admin: true };
-  const { data: profile } = await supabase.from('user_profiles').select('*').eq('id', userId).maybeSingle();
-  return profile;
+  try {
+    const supabase = await getSupabaseClient();
+    if (!supabase || userId === 'local-admin') {
+      return { id: userId, email: 'admin@webstersolutions.com', reveal_payout: true, is_admin: true };
+    }
+    const { data: profile } = await supabase.from('user_profiles').select('*').eq('id', userId).maybeSingle();
+    return profile || { id: userId, email: 'user@webstersolutions.com', reveal_payout: false, is_admin: false };
+  } catch (e) {
+    console.error("loadUserProfile failed, falling back:", e);
+    return { id: userId, email: 'admin@webstersolutions.com', reveal_payout: true, is_admin: true };
+  }
 }
 
 function uid(prefix) {
