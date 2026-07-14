@@ -71,7 +71,7 @@ create policy "Allow authenticated users to read sources"
 
 create policy "Allow admins to insert sources"
   on public.sources for insert to authenticated
-  using (exists (select 1 from public.user_profiles where id = auth.uid() and is_admin = true));
+  with check (exists (select 1 from public.user_profiles where id = auth.uid() and is_admin = true));
 
 create policy "Allow admins to update sources"
   on public.sources for update to authenticated
@@ -88,7 +88,7 @@ create policy "Allow authenticated users to read routes"
 
 create policy "Allow admins to insert routes"
   on public.routes for insert to authenticated
-  using (exists (select 1 from public.user_profiles where id = auth.uid() and is_admin = true));
+  with check (exists (select 1 from public.user_profiles where id = auth.uid() and is_admin = true));
 
 create policy "Allow admins to update routes"
   on public.routes for update to authenticated
