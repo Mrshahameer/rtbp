@@ -98,9 +98,12 @@
   }
 
   // ── Payout tier calculation ───────────────────────────────
+  // $1-$40 = 1x, $41-$100 = 2x, $101+ = 3x
   function getTierLabel(payout, rangeSize) {
-    const multiplier = Math.ceil(Math.max(0.01, payout) / rangeSize);
-    return `${multiplier}x`;
+    const val = Number(payout || 0);
+    if (val <= 40) return '1x';
+    if (val <= 100) return '2x';
+    return '3x';
   }
 
   function formatPayout(payout, payoutVisible, rangeSize) {

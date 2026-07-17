@@ -59,7 +59,6 @@
     const track      = document.getElementById('payout-toggle-track');
     const thumb      = document.getElementById('payout-toggle-thumb');
     const badge      = document.getElementById('payout-status-badge');
-    const rangeInput = document.getElementById('payout-range-size');
 
     function applyToggleUI(visible) {
       if (visible) {
@@ -80,7 +79,6 @@
     // Load saved state
     chk.checked = config.payoutVisible === true;
     applyToggleUI(chk.checked);
-    rangeInput.value = config.payoutRangeSize || 40;
 
     // Toggle click on the container div (avoids double toggle bugs)
     container.addEventListener('click', async () => {
@@ -89,24 +87,6 @@
       await saveConfig(config);
       applyToggleUI(chk.checked);
       toast(chk.checked ? '💰 Payout revealed to agents' : '🔒 Payout hidden — agents see tiers');
-    });
-
-    // Range size — save on Update button click
-    const saveBtn = document.getElementById('payout-range-save-btn');
-    const hint    = document.getElementById('payout-range-hint');
-
-    function updateHint(size) {
-      hint.textContent = `$1–${size} = 1x  ·  $${size+1}–${size*2} = 2x  ·  $${size*2+1}–${size*3} = 3x …`;
-    }
-    updateHint(config.payoutRangeSize || 40);
-
-    saveBtn.addEventListener('click', async () => {
-      const val = parseInt(rangeInput.value);
-      if (!val || val < 1) { toast('⚠️ Enter a valid range size'); return; }
-      config.payoutRangeSize = val;
-      await saveConfig(config);
-      updateHint(val);
-      toast(`✅ Tier size updated: $1–${val} = 1x, $${val+1}–${val*2} = 2x …`);
     });
   }
 
